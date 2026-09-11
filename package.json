@@ -1,0 +1,34 @@
+{
+  "name": "pattern-b-speech-rag-tts-avatar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "src/shared",
+    "src/api",
+    "src/web"
+  ],
+  "engines": {
+    "node": ">=22 <25",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "concurrently -k -n api,web -c blue,green \"npm run dev --workspace @pattern-b/api\" \"npm run dev --workspace @pattern-b/web\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.35.0",
+    "@types/node": "22.18.3",
+    "concurrently": "9.2.1",
+    "eslint": "9.35.0",
+    "prettier": "3.6.2",
+    "typescript": "5.9.2",
+    "typescript-eslint": "8.42.0",
+    "vitest": "3.2.4"
+  }
+}
