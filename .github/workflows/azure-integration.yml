@@ -1,0 +1,33 @@
+name: Azure integration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  shared-search:
+    environment: azure-integration
+    runs-on: ubuntu-latest
+    env:
+      AZURE_SEARCH_ENDPOINT: https://srch-dev-zmh4qttuqdrbi.search.windows.net
+      AZURE_SEARCH_INDEX: knowledge-index
+      AZURE_SEARCH_SEMANTIC_CONFIG: knowledge-semantic
+      AZURE_EMBEDDING_DIMENSIONS: 1536
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Validate fixed questions against shared Search
+        run: npm run search:validate-retrieval

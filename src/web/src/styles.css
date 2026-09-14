@@ -91,12 +91,72 @@ h1 {
   justify-content: center;
   border-right: 1px solid #a9aaa1;
 }
+.avatar-viewport {
+  position: relative;
+  width: min(100%, 760px);
+  aspect-ratio: 16 / 9;
+  margin-bottom: 28px;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(27, 37, 34, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27, 37, 34, 0.08) 1px, transparent 1px), #dfe3dc;
+  background-size: 32px 32px;
+  border: 1px solid #a9aaa1;
+}
+.avatar-viewport video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  background: #1b2522;
+}
+.avatar-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  color: #68736d;
+}
+.avatar-monogram {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  color: #f4f1e8;
+  background: #247c5c;
+  font: 500 28px 'IBM Plex Mono';
+}
+.avatar-placeholder strong,
+.avatar-mode {
+  font: 500 11px 'IBM Plex Mono';
+}
+.avatar-mode {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 8px;
+  color: white;
+  background: #1b2522;
+}
+.playback-button {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid #f4f1e8;
+  color: #f4f1e8;
+  background: #1b2522;
+  cursor: pointer;
+}
 .signal {
-  height: 110px;
+  height: 54px;
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-bottom: 48px;
+  margin-bottom: 28px;
   opacity: 0.28;
 }
 .signal i {
@@ -135,6 +195,29 @@ h1 {
   margin: 18px 0 0;
   color: #d94b2b;
   font-size: 18px;
+}
+.answer-block {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #a9aaa1;
+}
+.answer-text {
+  margin: 12px 0 0;
+  font-size: 20px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+.citations {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+  font: 400 12px 'IBM Plex Mono';
+}
+.citations a {
+  color: #247c5c;
+  overflow-wrap: anywhere;
 }
 .pipeline {
   padding: 36px 28px;
@@ -206,6 +289,14 @@ h1 {
   border-left: 3px solid #d94b2b;
   background: #f4dcd2;
 }
+.avatar-notice {
+  margin: 0 clamp(20px, 4vw, 64px);
+  padding: 10px 16px;
+  color: #3d534b;
+  border-left: 3px solid #247c5c;
+  background: #dce8e1;
+  font-size: 13px;
+}
 @keyframes wave {
   from {
     height: 10%;
@@ -235,6 +326,9 @@ h1 {
   .signal {
     margin-bottom: 30px;
     gap: 4px;
+  }
+  .avatar-viewport {
+    margin-bottom: 22px;
   }
   .topbar {
     min-height: 78px;

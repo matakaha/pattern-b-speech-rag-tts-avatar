@@ -1,0 +1,10 @@
+{
+  "documents": [
+    {
+      "path": "sample-policy.md",
+      "title": "サンプル社内制度",
+      "sourceUrl": "https://example.com/policies/sample",
+      "acl": ["public"]
+    }
+  ]
+}

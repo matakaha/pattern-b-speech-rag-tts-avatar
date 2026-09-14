@@ -18,17 +18,26 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "package:app": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-app.ps1",
+    "search:index": "tsx scripts/create-index.ts",
+    "search:ingest": "tsx scripts/ingest-documents.ts",
+    "search:validate": "tsx scripts/validate-search.ts",
+    "search:validate-retrieval": "tsx scripts/validate-search-retrieval.ts",
+    "start": "npm run start --workspace @pattern-b/api",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
     "@eslint/js": "9.35.0",
+    "@playwright/test": "^1.63.0",
     "@types/node": "22.18.3",
-    "concurrently": "9.2.1",
+    "ajv": "^8.20.0",
+    "concurrently": "9.2.4",
     "eslint": "9.35.0",
     "prettier": "3.6.2",
     "typescript": "5.9.2",
     "typescript-eslint": "8.42.0",
-    "vitest": "3.2.4"
+    "vitest": "3.2.7"
   }
 }

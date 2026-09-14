@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/matakaha/pattern-b-speech-rag-tts-avatar/tests/fixtures/pattern-comparison.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "dataset", "search", "patterns", "questions"],
+  "properties": {
+    "version": { "const": 1 },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "branch", "faqRoot"],
+      "properties": {
+        "repository": { "const": "matakaha/rubberduckexpress" },
+        "branch": { "const": "main" },
+        "faqRoot": { "const": "faq" }
+      }
+    },
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "serviceName",
+        "indexName",
+        "semanticConfigurationName",
+        "vectorFieldName",
+        "embeddingDimensions",
+        "topK"
+      ],
+      "properties": {
+        "serviceName": { "const": "srch-dev-zmh4qttuqdrbi" },
+        "indexName": { "const": "knowledge-index" },
+        "semanticConfigurationName": { "const": "knowledge-semantic" },
+        "vectorFieldName": { "const": "contentVector" },
+        "embeddingDimensions": { "const": 1536 },
+        "topK": { "type": "integer", "minimum": 1, "maximum": 20 }
+      }
+    },
+    "patterns": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["patternABaseUrlEnvironmentVariable", "patternBBaseUrlEnvironmentVariable"],
+      "properties": {
+        "patternABaseUrlEnvironmentVariable": { "const": "PATTERN_A_BASE_URL" },
+        "patternBBaseUrlEnvironmentVariable": { "const": "PATTERN_B_BASE_URL" }
+      }
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "question",
+          "expectedFaqId",
+          "expectedTitle",
+          "expectedCategory",
+          "expectedSourcePath",
+          "expectedSourceUri",
+          "expectedKeywords"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^Q(0[1-9]|10)$" },
+          "question": { "type": "string", "minLength": 1 },
+          "expectedFaqId": { "type": "string", "pattern": "^RDE-FAQ-[0-9]{3}$" },
+          "expectedTitle": { "type": "string", "minLength": 1 },
+          "expectedCategory": { "type": "string", "minLength": 1 },
+          "expectedSourcePath": {
+            "type": "string",
+            "pattern": "^faq/[0-9]{2}-[^/]+/RDE-FAQ-[0-9]{3}-[^/]+\\.md$"
+          },
+          "expectedSourceUri": {
+            "type": "string",
+            "pattern": "^https://github\\.com/matakaha/rubberduckexpress/blob/main/faq/"
+          },
+          "expectedKeywords": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

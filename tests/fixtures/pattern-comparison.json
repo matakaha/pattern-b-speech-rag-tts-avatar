@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "dataset": {
+    "repository": "matakaha/rubberduckexpress",
+    "branch": "main",
+    "faqRoot": "faq"
+  },
+  "search": {
+    "serviceName": "srch-dev-zmh4qttuqdrbi",
+    "indexName": "knowledge-index",
+    "semanticConfigurationName": "knowledge-semantic",
+    "vectorFieldName": "contentVector",
+    "embeddingDimensions": 1536,
+    "topK": 5
+  },
+  "patterns": {
+    "patternABaseUrlEnvironmentVariable": "PATTERN_A_BASE_URL",
+    "patternBBaseUrlEnvironmentVariable": "PATTERN_B_BASE_URL"
+  },
+  "questions": [
+    {
+      "id": "Q01",
+      "question": "初めて荷物を送ります。発送の流れを教えてください。",
+      "expectedFaqId": "RDE-FAQ-002",
+      "expectedTitle": "荷物を発送する手順を教えてください",
+      "expectedCategory": "発送・サービス",
+      "expectedSourcePath": "faq/01-shipping/RDE-FAQ-002-how-to-ship.md",
+      "expectedSourceUri": "https://github.com/matakaha/rubberduckexpress/blob/main/faq/01-shipping/RDE-FAQ-002-how-to-ship.md",
+      "expectedKeywords": ["梱包", "送り状", "お問い合わせ番号"]
+    },
+    {
+      "id": "Q02",
+      "question": "お問い合わせ番号を使って荷物が今どこにあるか確認したいです。",
+      "expectedFaqId": "RDE-FAQ-008",
+      "expectedTitle": "荷物の配送状況を確認するにはどうすればよいですか",
+      "expectedCategory": "追跡・配達",
+      "expectedSourcePath": "faq/02-tracking-delivery/RDE-FAQ-008-track-package.md",
+      "expectedSourceUri": "https://github.com/matakaha/rubberduckexpress/blob/main/faq/02-tracking-delivery/RDE-FAQ-008-track-package.md",
+      "expectedKeywords": ["追跡", "お問い合わせ番号", "配送状況"]
+    },
+    {
+      "id": "Q03",
+      "question": "留守で荷物を受け取れなかった場合、荷物はどうなりますか。",
+      "expectedFaqId": "RDE-FAQ-012",
+      "expectedTitle": "配達時に不在だった場合はどうなりますか",
+      "expectedCategory": "追跡・配達",
+      "expectedSourcePath": "faq/02-tracking-delivery/RDE-FAQ-012-absence.md",
+      "expectedSourceUri": "https://github.com/matakaha/rubberduckexpress/blob/main/faq/02-tracking-delivery/RDE-FAQ-012-absence.md",
+      "expectedKeywords": ["不在票", "営業所", "再配達"]
+    },
+    {
+      "id": "Q04",
+      "question": "荷物を受け取るときに身分証明書は必要ですか。",
+      "expectedFaqId": "RDE-FAQ-018",
+      "expectedTitle": "荷物の受取時に本人確認は必要ですか",
+      "expectedCategory": "受取",
+      "expectedSourcePath": "faq/03-receiving/RDE-FAQ-018-identity-check.md",
+      "expectedSourceUri": "https://github.com/matakaha/rubberduckexpress/blob/main/faq/03-receiving/RDE-FAQ-018-identity-check.md",
+      "expectedKeywords": ["本人確認", "身分証明書"]
+    },
+    {
+      "id": "Q05",
+      "question": "送料は何を基準に決まりますか。",
+      "expectedFaqId": "RDE-FAQ-024",
+      "expectedTitle": "送料はどのように決まりますか",
+      "expectedCategory": "料金・支払",
+      "expectedSourcePath": "faq/04-fees-payment/RDE-FAQ-024-shipping-fee.md",
+      "expectedSourceUri": "https://github.com/matakaha/rubberduckexpress/blob/main/faq/04-fees-payment/RDE-FAQ-024-shipping-fee.md",
+      "expectedKeywords": ["サイズ", "重量", "配送地域"]
+    },
+    {
+      "id": "Q06",
+      "question": "代金引換の手数料と利用できる上限金額を教えてください。",
+      "expectedFaqId": "RDE-FAQ-027",
+      "expectedTitle": "代金引換の手数料と利用上限を教えてください",
+      "expectedCategory": "料金・支払",
+      "expectedSourcePath": "faq/04-fees-payment/RDE-FAQ-027-cod-fee-limit.md",
+      "expectedSourceUri": "https://github.com/matakaha/rubberduckexpress/blob/main/faq/04-fees-payment/RDE-FAQ-027-cod-fee-limit.md",
+      "expectedKeywords": ["手数料", "30万円", "代金引換"]
+    },
+    {
+      "id": "Q07",
+      "question": "荷物を安全に送るための基本的な梱包方法を教えてください。",
+      "expectedFaqId": "RDE-FAQ-031",
+      "expectedTitle": "荷物はどのように梱包すればよいですか",
+      "expectedCategory": "梱包・取扱制限",
+      "expectedSourcePath": "faq/05-packaging-restrictions/RDE-FAQ-031-basic-packaging.md",
+      "expectedSourceUri": "https://github.com/matakaha/rubberduckexpress/blob/main/faq/05-packaging-restrictions/RDE-FAQ-031-basic-packaging.md",
+      "expectedKeywords": ["段ボール", "緩衝材", "封かん"]
+    },
+    {
+      "id": "Q08",
+      "question": "発送後に届け先の住所を変更できますか。",
+      "expectedFaqId": "RDE-FAQ-038",
+      "expectedTitle": "発送後に届け先住所を変更できますか",
+      "expectedCategory": "変更・キャンセル",
+      "expectedSourcePath": "faq/06-changes-cancellation/RDE-FAQ-038-change-address.md",
+      "expectedSourceUri": "https://github.com/matakaha/rubberduckexpress/blob/main/faq/06-changes-cancellation/RDE-FAQ-038-change-address.md",
+      "expectedKeywords": ["住所変更", "転送", "発送後"]
+    },
+    {
+      "id": "Q09",
+      "question": "箱がつぶれて内容品も壊れて届きました。どうすればよいですか。",
+      "expectedFaqId": "RDE-FAQ-043",
+      "expectedTitle": "荷物が破損して届いた場合はどうすればよいですか",
+      "expectedCategory": "事故・補償",
+      "expectedSourcePath": "faq/07-trouble-compensation/RDE-FAQ-043-damaged-package.md",
+      "expectedSourceUri": "https://github.com/matakaha/rubberduckexpress/blob/main/faq/07-trouble-compensation/RDE-FAQ-043-damaged-package.md",
+      "expectedKeywords": ["破損", "調査", "補償"]
+    },
+    {
+      "id": "Q10",
+      "question": "住所などの個人情報や配送履歴はどのように扱われますか。",
+      "expectedFaqId": "RDE-FAQ-050",
+      "expectedTitle": "個人情報や配送履歴はどのように取り扱われますか",
+      "expectedCategory": "会員・個人情報",
+      "expectedSourcePath": "faq/08-account-privacy/RDE-FAQ-050-personal-information.md",
+      "expectedSourceUri": "https://github.com/matakaha/rubberduckexpress/blob/main/faq/08-account-privacy/RDE-FAQ-050-personal-information.md",
+      "expectedKeywords": ["個人情報", "配送履歴", "保存"]
+    }
+  ]
+}

@@ -81,9 +81,9 @@ Key Vault は作成しない。API キーを Key Vault に隠して利用する�
 |---|---|---|---|
 | BFF Managed Identity | Speech リソース | `Cognitive Services Speech User` | STT、TTS、Avatar |
 | BFF Managed Identity | 対象 Search index | `Search Index Data Reader` | クエリのみ |
-| BFF Managed Identity | Foundry リソース | `Cognitive Services User` | 回答と embedding の推論 |
-| デプロイ用 ID | Search service | `Search Service Contributor` | index 定義の管理 |
-| デプロイ用 ID | 対象 Search index | `Search Index Data Contributor` | 文書投入 |
+| BFF Managed Identity | Foundry リソース | `Cognitive Services OpenAI User` | 回答と embedding の推論 |
+| デプロイ用 ID | 共有 Search service | index 定義を読み取れる管理権限 | schema preflight のみ |
+| GitHub Actions OIDC ID | 対象 Search index | `Search Index Data Reader` | 固定質問のread-only検証 |
 
 Search のデータプレーン認証は RBAC-only に設定し、API キー認証を無効にする。ランタイム ID に Search 管理権限や文書書き込み権限を付与しない。
 
@@ -137,9 +137,9 @@ AZURE_SPEECH_RESOURCE_ID=/subscriptions/.../providers/Microsoft.CognitiveService
 AZURE_FOUNDRY_BASE_URL=https://YOUR_RESOURCE.services.ai.azure.com/openai/v1/
 AZURE_CHAT_DEPLOYMENT=YOUR_CHAT_MODEL_DEPLOYMENT
 AZURE_EMBEDDING_DEPLOYMENT=YOUR_EMBEDDING_DEPLOYMENT
-AZURE_SEARCH_ENDPOINT=https://YOUR_SEARCH.search.windows.net
-AZURE_SEARCH_INDEX=avatar-rag
-AZURE_SEARCH_SEMANTIC_CONFIG=default
+AZURE_SEARCH_ENDPOINT=https://srch-dev-zmh4qttuqdrbi.search.windows.net
+AZURE_SEARCH_INDEX=knowledge-index
+AZURE_SEARCH_SEMANTIC_CONFIG=knowledge-semantic
 SPEECH_RECOGNITION_LANGUAGE=ja-JP
 SPEECH_SYNTHESIS_VOICE=YOUR_SUPPORTED_JA_JP_VOICE
 AVATAR_CHARACTER=YOUR_STANDARD_AVATAR
@@ -184,7 +184,9 @@ continuous recognition では複数の final が生じ得るため、`speechEndD
 
 BFF はセッションごとに Speech recognizer、Push Stream、現在の `turnId`、`AbortController`、LLM stream、Avatar 合成キュー、Avatar synthesizer、WebRTC signaling 状態を所有する。TTL、同時接続数、WebSocket message size、音声時間、HTTP body、質問長、履歴件数、要求頻度を制限する。切断、TTL 超過、`DELETE /api/sessions/{sessionId}` で全リソースを閉じる。
 
-Browser から BFF へ `start`、binary PCM、`audio-end`、`cancel` を送る。BFF から Browser へ `session.ready`、`stt.recognizing`、`stt.recognized`、`speech.started`、`speech.ended`、`turn.state`、`error` を返す。全イベントに `sessionId`、ターン固有イベントに `turnId` を含める。
+Browser から BFF へ `audio.start`、binary PCM、`audio.end`、`cancel` を送る。BFF から Browser へ `session.ready`、`stt.recognizing`、`stt.recognized`、`speech.started`、`speech.ended`、`playback.stop`、`turn.state`、`error` を返す。全イベントに `sessionId`、ターン固有イベントに `turnId` を含める。`playback.stop`は単調増加する割り込みepochを持つ。
+
+既定値はsession作成10回/分/IP、answer 20回/分/session、Avatar signaling 10回/分/session、WebSocket 1本/session、音声160 frame/秒かつ64 KiB/秒、1発話30秒、control message 1 KiBである。標準JSON bodyは16 KiB、Avatar SDP bodyは160 KiBに制限する。answerとAvatar signalingは同一sessionで各1件だけ許可する。超過時は`429`と`Retry-After`、音声違反時は安全なWebSocket error eventとclose codeを返す。固定窓rate limiterは単一instance PoC向けであり、複数instanceでは共有制限へ置き換える。
 
 ## 9. RAG と LLM API
 
@@ -206,7 +208,10 @@ Browser から BFF へ `start`、binary PCM、`audio-end`、`cancel` を送る�
 
 ```text
 event: retrieval
-data: {"sessionId":"...","turnId":"...","durationMs":123,"citations":[]}
+data: {"sessionId":"...","turnId":"...","durationMs":123,"count":2}
+
+event: citation
+data: {"sessionId":"...","turnId":"...","citationId":"C1","chunkId":"...","title":"...","sourceUrl":"https://..."}
 
 event: delta
 data: {"sessionId":"...","turnId":"...","text":"申請は"}
@@ -231,11 +236,11 @@ BFF は Search endpoint、index name、実行環境に応じた上記資格情�
 - vector query: 同じ質問の embedding
 - query type: semantic
 - `topK`: Pattern A と同値
-- select: `chunkId`, `title`, `content`, `sourceUrl`, `acl`
-- filter: PoC の固定データ境界をサーバー側で強制
+- select: `chunkId`, `title`, `content`, `sourceUri`, `category`, `tags`, `intents`, `locale`
+- filter: なし。共有FAQ 50件はすべて公開可能な架空データ
 - 検索結果本文と token budget に固定上限を設定
 
-匿名 PoC では利用者 ID に基づく ACL は成立しない。利用者別 ACL が必要になった時点で利用者認証を別要件として追加する。クライアント指定の ACL filter は信用しない。
+`sourceUri`は内部citationの`sourceUrl`へmappingし、`https://github.com/matakaha/rubberduckexpress/blob/main/faq/`配下だけをUIへ返す。利用者別ACLが必要になった時点で利用者認証と文書ACLを別要件として追加する。
 
 ### 9.3 Prompt と Foundry Models
 
@@ -269,13 +274,13 @@ Managed Identity の bearer token と Speech endpoint は Browser へ返さな�
 
 ## 12. Barge-in と状態管理
 
-Avatar 再生中も BFF の STT を継続し、`speechStartDetected` または有効な interim transcript を barge-in 候補とする。
+Avatar 再生中も BFF の STT を継続する。Browserの`audio.start`で先行停止し、Speech SDKの`speechStartDetected`を正本とする。interim transcriptは誤検出を避けるためbarge-in triggerにしない。
 
-1. 現在ターンの `AbortController.abort()` を実行する。
+1. generationを進め、現在ターンの `AbortController.abort()` を実行する。
 2. LLM stream を中断する。
 3. 未処理の合成キューを削除する。
 4. Avatar synthesizer の停止 API を呼ぶ。
-5. Browser へ playback stop event を送り、残留音声を止める。
+5. Browser へepoch付き`playback.stop`を送り、media elementを75 ms切り離して残留音声を止める。WebRTC peerは維持する。
 6. 新しい `turnId` を発行し、古いイベントを無効化する。
 7. 検出から音声停止までの時間を記録する。
 
@@ -318,6 +323,8 @@ isSpeaking: true | false
 
 Cookie を使わないため、この PoC では CSRF token を設けず、Origin 検証を強制する。エラーは `code`、`retryable`、`stage`、`correlationId` を持つ安全な形式へ変換し、SDK の詳細エラー、token、endpoint、文書本文を Browser へそのまま返さない。
 
+ログは`event`、`severity`、`timestamp`、`correlationId`、公開`code`/`stage`、`retryable`、duration、countだけを許可する。質問、transcript/PII、prompt/history、token、Authorization、ICE username/credential、SDP、endpoint、request body、raw Error/cause/stack、session IDは受け付けない。401/403、429、timeout、unavailableはadapter境界で公開codeへ変換し、routeやUIは固定文言だけを扱う。
+
 ## 15. テレメトリ
 
 - `speech_start_ms` / `speech_end_ms` / `stt_final_ms`
@@ -346,6 +353,20 @@ Pattern A と同じイベント名、単位、時刻基準を使う。質問、�
 | コスト | 1 分、1 ターン、1 セッション当たり |
 
 ## 17. テスト
+
+### Phase 6 の配備と運用
+
+- `infra/main.bicep`はLog Analytics、Application Insights、Storage、Speech、Azure OpenAI、Linux App Service、resource-scoped RBACを構成し、共有AI Searchを`existing`参照する。
+- App ServiceはB1、1 instance、Node.js 24 LTS、Always On、WebSocket、HTTPS-only、TLS 1.2、`/healthz`を使用する。
+- Speech、Search、Azure OpenAIはlocal authenticationを無効にし、Web Appのsystem-assigned Managed Identityだけをランタイム認証に使う。
+- [infra/main.bicepparam](../infra/main.bicepparam) は非秘密の環境差分だけを保持する。秘密値はparameter fileに保存しない。
+- `scripts/package-app.ps1`はbuild済み成果物とproduction dependencyだけをZIPのrootへ格納する。
+- `scripts/deploy-infra.ps1`はresource groupとBicepをデプロイし、outputsを`.artifacts/deployment-outputs.json`へ保存する。
+- `scripts/deploy-app.ps1`はAzure CLIのZIP deployでpackageを展開し、Web Appを再起動する。
+- `scripts/verify-deployment.ps1`はhost設定、Managed Identity、最小RBAC、health endpointを検証する。
+- `scripts/remove-environment.ps1`はresource group名の完全一致による明示確認後にだけ削除する。resource group削除は不可逆である。
+- 共有Search index schemaと文書はPattern Bで管理しない。index作成・投入scriptは`knowledge-index`へのwriteを拒否する。
+- public network accessと匿名入口はPoC用である。実データ利用前にPrivate Endpoint/VNetまたはApp Serviceアクセス制限を適用する。
 
 ### 単体
 
@@ -383,7 +404,7 @@ Pattern A と同じイベント名、単位、時刻基準を使う。質問、�
 - 発話中の割り込みで LLM、queue、Avatar、再生の全段が停止する。
 - Avatar 障害時も字幕で回答を確認できる。
 - API キー、接続文字列、クライアントシークレット、Azure token、Speech endpoint/resource ID が Browser またはログに露出しない。
-- BFF ランタイム ID は Speech User、Search Index Data Reader、Cognitive Services User だけを持つ。
+- BFF ランタイム ID は Speech User、Search Index Data Reader、Cognitive Services OpenAI User だけを持つ。
 - Azure 上でローカル開発者資格情報への fallback が無効である。
 - Bicep と scripts で同じ環境を再現・削除できる。
 
@@ -414,4 +435,8 @@ Pattern A と同じイベント名、単位、時刻基準を使う。質問、�
 - Foundry Models endpoints and keyless authentication: https://learn.microsoft.com/azure/ai-foundry/foundry-models/how-to/inference
 - Foundry Models Microsoft Entra configuration: https://learn.microsoft.com/azure/ai-foundry/foundry-models/how-to/configure-entra-id
 - Managed Identity best practices: https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/managed-identity-best-practice-recommendations
+- Bicep parameter files: https://learn.microsoft.com/azure/azure-resource-manager/bicep/parameter-files
+- App Service ZIP deployment: https://learn.microsoft.com/azure/app-service/deploy-zip
+- App Service configuration: https://learn.microsoft.com/azure/app-service/configure-common
+- Resource group deletion: https://learn.microsoft.com/azure/azure-resource-manager/management/delete-resource-group
 - Speech pricing: https://azure.microsoft.com/pricing/details/speech/
