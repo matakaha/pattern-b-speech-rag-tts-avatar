@@ -15,6 +15,7 @@ import {
 
 import { postSse } from '../api/postSse';
 import { AvatarPeerConnection } from '../avatar/AvatarPeerConnection';
+import pcmWorkletUrl from '../audio/pcm-worklet.ts?worker&url';
 
 const MAX_BUFFERED_BYTES = 256 * 1024;
 const DEFAULT_AVATAR_RECONNECT = { reconnectMaxAttempts: 3, reconnectBaseDelayMs: 1_000 };
@@ -121,10 +122,13 @@ export function useConversationSession() {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
       });
+      mediaStreamRef.current = stream;
       const context = new AudioContext();
-      await context.audioWorklet.addModule(new URL('../audio/pcm-worklet.ts', import.meta.url));
+      audioContextRef.current = context;
+      await context.audioWorklet.addModule(pcmWorkletUrl);
       const source = context.createMediaStreamSource(stream);
       const worklet = new AudioWorkletNode(context, 'pcm-capture');
+      workletRef.current = worklet;
       const silentGain = context.createGain();
       silentGain.gain.value = 0;
       source.connect(worklet).connect(silentGain).connect(context.destination);
@@ -145,9 +149,6 @@ export function useConversationSession() {
         );
       };
 
-      mediaStreamRef.current = stream;
-      audioContextRef.current = context;
-      workletRef.current = worklet;
       socket.send(
         JSON.stringify({
           type: 'audio.start',
@@ -161,16 +162,42 @@ export function useConversationSession() {
       answerRef.current = '';
       setCitations([]);
       setState('listening');
-    } catch {
-      fail('マイクを開始できませんでした。ブラウザーの権限を確認してください。');
+    } catch (cause) {
+      console.error('Failed to start microphone capture.', cause);
+      await releaseMicrophone();
+      fail(getMicrophoneErrorMessage(cause));
     }
   }
 
+  function getMicrophoneErrorMessage(cause: unknown): string {
+    if (cause instanceof DOMException) {
+      if (cause.name === 'NotAllowedError') {
+        return 'マイクの使用が許可されていません。ブラウザーの権限を確認してください。';
+      }
+      if (cause.name === 'NotFoundError') {
+        return '利用できるマイクが見つかりません。マイクを接続して再試行してください。';
+      }
+      if (cause.name === 'NotReadableError') {
+        return 'マイクを利用できません。ほかのアプリで使用されていないか確認してください。';
+      }
+    }
+    return '音声処理を開始できませんでした。ページを再読み込みして再試行してください。';
+  }
+
   async function stopListening(): Promise<void> {
+    await finishAudioCapture();
+    setState('processing');
+  }
+
+  async function finishAudioCapture(): Promise<void> {
+    const wasCapturing = Boolean(
+      workletRef.current || mediaStreamRef.current || audioContextRef.current,
+    );
     await releaseMicrophone();
     const socket = socketRef.current;
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'audio.end' }));
-    setState('processing');
+    if (wasCapturing && socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'audio.end' }));
+    }
   }
 
   async function releaseMicrophone(): Promise<void> {
@@ -181,7 +208,10 @@ export function useConversationSession() {
     mediaStreamRef.current = undefined;
     audioContextRef.current = undefined;
 
-    worklet?.disconnect();
+    if (worklet) {
+      worklet.port.onmessage = null;
+      worklet.disconnect();
+    }
     mediaStream?.getTracks().forEach((track) => track.stop());
     if (audioContext && audioContext.state !== 'closed') await audioContext.close();
   }
@@ -244,7 +274,7 @@ export function useConversationSession() {
     if (event.type === 'speech.ended') {
       setInterim('');
       setState('processing');
-      void releaseMicrophone();
+      void finishAudioCapture();
     }
     if (event.type === 'stt.recognizing') setInterim(event.text);
     if (event.type === 'stt.recognized') {

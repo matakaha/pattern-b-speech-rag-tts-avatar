@@ -36,14 +36,23 @@ param searchSemanticConfigName string = 'knowledge-semantic'
 @minValue(1)
 param embeddingDimensions int = 1536
 
+@description('Subscription containing the existing Microsoft Foundry account.')
+param existingFoundrySubscriptionId string = subscription().subscriptionId
+
+@description('Resource group containing the existing Microsoft Foundry account.')
+param existingFoundryResourceGroupName string = 'rg-voice-live-avatar-rag-dev'
+
+@description('Existing Microsoft Foundry account name.')
+param existingFoundryAccountName string = 'aif-dev-zmh4qttuqdrbi'
+
 @description('Chat model deployment name.')
-param chatDeploymentName string = 'chat'
+param chatDeploymentName string = 'gpt-5-mini'
 
 @description('Chat model name.')
-param chatModelName string = 'gpt-4o-mini'
+param chatModelName string = 'gpt-5-mini'
 
 @description('Chat model version.')
-param chatModelVersion string = '2024-07-18'
+param chatModelVersion string = '2025-08-07'
 
 @description('Chat model deployment SKU.')
 param chatDeploymentSku string = 'GlobalStandard'
@@ -53,20 +62,7 @@ param chatDeploymentSku string = 'GlobalStandard'
 param chatDeploymentCapacity int = 10
 
 @description('Embedding model deployment name.')
-param embeddingDeploymentName string = 'embedding'
-
-@description('Embedding model name.')
-param embeddingModelName string = 'text-embedding-3-small'
-
-@description('Embedding model version.')
-param embeddingModelVersion string = '1'
-
-@description('Embedding model deployment SKU.')
-param embeddingDeploymentSku string = 'Standard'
-
-@description('Embedding model deployment capacity in thousands of tokens per minute.')
-@minValue(1)
-param embeddingDeploymentCapacity int = 10
+param embeddingDeploymentName string = 'text-embedding-3-small'
 
 var normalizedSuffix = toLower(replace(resourceSuffix, '-', ''))
 var generatedSuffix = substring(uniqueString(subscription().subscriptionId, resourceGroup().id, environmentName), 0, 6)
@@ -114,21 +110,14 @@ module speech './modules/speech.bicep' = {
 
 module foundry './modules/foundry.bicep' = {
   name: 'foundry'
+  scope: resourceGroup(existingFoundrySubscriptionId, existingFoundryResourceGroupName)
   params: {
-    location: location
-    name: '${namePrefix}-openai-${suffix}'
+    accountName: existingFoundryAccountName
     chatDeploymentName: chatDeploymentName
     chatModelName: chatModelName
     chatModelVersion: chatModelVersion
     chatDeploymentSku: chatDeploymentSku
     chatDeploymentCapacity: chatDeploymentCapacity
-    embeddingDeploymentName: embeddingDeploymentName
-    embeddingModelName: embeddingModelName
-    embeddingModelVersion: embeddingModelVersion
-    embeddingDeploymentSku: embeddingDeploymentSku
-    embeddingDeploymentCapacity: embeddingDeploymentCapacity
-    logAnalyticsResourceId: monitoring.outputs.logAnalyticsResourceId
-    tags: commonTags
   }
 }
 
@@ -153,12 +142,22 @@ module hosting './modules/hosting.bicep' = {
   }
 }
 
-module rbac './modules/rbac.bicep' = {
-  name: 'rbac'
+module speechRbac './modules/rbac.bicep' = {
+  name: 'speech-rbac'
   params: {
     principalId: hosting.outputs.principalId
-    speechAccountName: speech.outputs.name
-    foundryAccountName: foundry.outputs.name
+    accountName: speech.outputs.name
+    roleDefinitionId: 'f2dc8367-1007-4938-bd23-fe263f013447'
+  }
+}
+
+module foundryRbac './modules/rbac.bicep' = {
+  name: 'foundry-rbac'
+  scope: resourceGroup(existingFoundrySubscriptionId, existingFoundryResourceGroupName)
+  params: {
+    principalId: hosting.outputs.principalId
+    accountName: existingFoundryAccountName
+    roleDefinitionId: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
   }
 }
 

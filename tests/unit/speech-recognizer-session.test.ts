@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { TokenCredential } from '@azure/core-auth';
+import { CancellationErrorCode, CancellationReason } from 'microsoft-cognitiveservices-speech-sdk';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -93,6 +94,19 @@ describe('SpeechRecognizerSession', () => {
     expect(events.filter((event) => event.type === 'speech.ended')).toHaveLength(1);
   });
 
+  it('treats the closed audio stream as a normal completion', async () => {
+    vi.useFakeTimers();
+    const { session, events, getHandlers } = createSession();
+    await session.start();
+
+    getHandlers().onRecognized('one', 'こんにちは');
+    getHandlers().onCanceled(CancellationReason.EndOfStream, CancellationErrorCode.NoError);
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(events).toContainEqual(expect.objectContaining({ type: 'stt.recognized' }));
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'error' }));
+  });
+
   it('rejects an out-of-order audio frame', async () => {
     const { session } = createSession();
     await session.start();
@@ -106,6 +120,99 @@ describe('SpeechRecognizerSession', () => {
         }),
       ),
     ).toThrow('sequence mismatch');
+  });
+
+  it('ignores queued audio frames after audio input ends', async () => {
+    const { session, client } = createSession();
+    await session.start();
+
+    session.end();
+    session.write(
+      encodeAudioFrame({
+        sequence: 0,
+        sampleRate: PCM_SAMPLE_RATE,
+        samples: new Int16Array([100]),
+      }),
+    );
+    session.end();
+
+    expect(client.endAudio).toHaveBeenCalledOnce();
+    expect(client.write).not.toHaveBeenCalled();
+  });
+
+  it('ignores audio messages arriving after automatic speech completion', async () => {
+    vi.useFakeTimers();
+    const { session, client, getHandlers } = createSession();
+    await session.start();
+
+    getHandlers().onRecognized('one', 'こんにちは');
+    getHandlers().onSpeechEnded();
+    await vi.advanceTimersByTimeAsync(500);
+
+    session.write(
+      encodeAudioFrame({
+        sequence: 0,
+        sampleRate: PCM_SAMPLE_RATE,
+        samples: new Int16Array([100]),
+      }),
+    );
+    session.end();
+
+    expect(client.write).not.toHaveBeenCalled();
+    expect(client.endAudio).not.toHaveBeenCalled();
+    expect(client.stop).toHaveBeenCalledOnce();
+  });
+
+  it('ignores audio messages while automatic speech completion is stopping the SDK', async () => {
+    vi.useFakeTimers();
+    const { session, client, getHandlers } = createSession();
+    let finishStop: (() => void) | undefined;
+    vi.mocked(client.stop).mockImplementation(
+      () => new Promise<void>((resolve) => (finishStop = resolve)),
+    );
+    await session.start();
+
+    getHandlers().onRecognized('one', 'こんにちは');
+    getHandlers().onSpeechEnded();
+    vi.advanceTimersByTime(500);
+
+    session.write(
+      encodeAudioFrame({
+        sequence: 0,
+        sampleRate: PCM_SAMPLE_RATE,
+        samples: new Int16Array([100]),
+      }),
+    );
+    session.end();
+    finishStop?.();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(client.write).not.toHaveBeenCalled();
+    expect(client.endAudio).not.toHaveBeenCalled();
+  });
+
+  it('ends browser capture when the utterance timeout completes the turn', async () => {
+    vi.useFakeTimers();
+    const { session, client, events, getHandlers } = createSession();
+    await session.start();
+
+    getHandlers().onRecognized('one', 'こんにちは');
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    session.write(
+      encodeAudioFrame({
+        sequence: 0,
+        sampleRate: PCM_SAMPLE_RATE,
+        samples: new Int16Array([100]),
+      }),
+    );
+    session.end();
+
+    expect(events.map((event) => event.type)).toContain('speech.ended');
+    expect(events.map((event) => event.type)).toContain('stt.recognized');
+    expect(client.write).not.toHaveBeenCalled();
+    expect(client.endAudio).not.toHaveBeenCalled();
   });
 
   it('closes the recognizer exactly once', async () => {

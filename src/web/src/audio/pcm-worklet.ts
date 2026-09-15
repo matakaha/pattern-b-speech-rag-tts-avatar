@@ -12,9 +12,11 @@ declare function registerProcessor(
 declare const sampleRate: number;
 
 const TARGET_SAMPLE_RATE = 16_000;
+const TARGET_FRAME_SAMPLES = 320;
 
 class PcmCaptureProcessor extends AudioWorkletProcessor {
   #carry = new Float32Array(0);
+  #pending = new Int16Array(0);
 
   process(inputs: Float32Array[][]): boolean {
     const input = inputs[0]?.[0];
@@ -40,8 +42,22 @@ class PcmCaptureProcessor extends AudioWorkletProcessor {
 
     const consumed = Math.floor(outputLength * ratio);
     this.#carry = combined.slice(consumed);
-    if (output.length) this.port.postMessage(output, [output.buffer]);
+    if (output.length) this.#appendOutput(output);
     return true;
+  }
+
+  #appendOutput(output: Int16Array): void {
+    const pending = new Int16Array(this.#pending.length + output.length);
+    pending.set(this.#pending);
+    pending.set(output, this.#pending.length);
+
+    let offset = 0;
+    while (offset + TARGET_FRAME_SAMPLES <= pending.length) {
+      const frame = pending.slice(offset, offset + TARGET_FRAME_SAMPLES);
+      this.port.postMessage(frame, [frame.buffer]);
+      offset += TARGET_FRAME_SAMPLES;
+    }
+    this.#pending = pending.slice(offset);
   }
 }
 

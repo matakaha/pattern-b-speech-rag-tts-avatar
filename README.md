@@ -83,7 +83,7 @@ Avatar発話中にマイクを開始すると、Browserは即座に回答fetch�
 
 ## Azureへのデプロイ
 
-前提はAzure CLI 2.53.0以降、対象subscriptionを選択済みであること、デプロイIDがリソース作成とロール割り当てを実行できることです。既定値は [infra/main.bicepparam](infra/main.bicepparam) の`dev`、`southeastasia`、Linux App Service B1、1 instanceです。モデルとリージョンの組み合わせ、quota、Avatar対応状況は実行前に確認してください。
+前提はAzure CLI 2.53.0以降、対象subscriptionを選択済みであること、デプロイIDがリソース作成とロール割り当てを実行できることです。既定値は [infra/main.bicepparam](infra/main.bicepparam) の`dev`、`southeastasia`、Linux App Service B1、1 instanceです。チャットモデルのリージョン対応とquota、Avatar対応状況は実行前に確認してください。
 
 ```powershell
 az login
@@ -94,6 +94,8 @@ az account set --subscription "YOUR_SUBSCRIPTION_ID"
 この処理は共有Search schemaをread-onlyで事前確認してからBicepをデプロイし、非秘密のoutputsを`.artifacts/deployment-outputs.json`へ保存します。Web Appのsystem-assigned Managed Identityには、共有index scopeの`Search Index Data Reader`、`Cognitive Services Speech User`、`Cognitive Services OpenAI User`だけを付与します。
 
 Search service `srch-dev-zmh4qttuqdrbi`と`knowledge-index`は`rg-voice-live-avatar-rag-dev`にあるPattern A所有の共有resourceです。Pattern BのBicep、deploy、cleanupはこのSearchを作成、更新、投入、削除しません。
+
+Foundry account `aif-dev-zmh4qttuqdrbi`とembedding deployment `text-embedding-3-small`もPattern A所有の共有resourceです。Pattern Bは既存accountを`existing`参照し、Responses API用の`gpt-5-mini` deploymentだけを追加します。Web Appの`Cognitive Services OpenAI User`は共有account scopeへ割り当てます。
 
 ```powershell
 ./scripts/deploy-app.ps1

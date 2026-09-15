@@ -1,47 +1,26 @@
 @description('Object ID of the Web App managed identity.')
 param principalId string
 
-@description('Azure AI Speech account name.')
-param speechAccountName string
+@description('Cognitive Services account name.')
+param accountName string
 
-@description('Azure OpenAI account name.')
-param foundryAccountName string
+@description('Built-in role definition ID assigned on the account.')
+param roleDefinitionId string
 
-var speechUserRoleId = 'f2dc8367-1007-4938-bd23-fe263f013447'
-var openAiUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
-
-resource speechAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
-  name: speechAccountName
+resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
+  name: accountName
 }
 
-resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
-  name: foundryAccountName
+resource roleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: roleDefinitionId
 }
 
-resource speechUserRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: speechUserRoleId
-}
-
-resource openAiUserRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: openAiUserRoleId
-}
-
-resource speechUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(speechAccount.id, principalId, speechUserRole.id)
-  scope: speechAccount
+resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(account.id, principalId, roleDefinition.id)
+  scope: account
   properties: {
     principalId: principalId
     principalType: 'ServicePrincipal'
-    roleDefinitionId: speechUserRole.id
-  }
-}
-
-resource openAiUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(foundryAccount.id, principalId, openAiUserRole.id)
-  scope: foundryAccount
-  properties: {
-    principalId: principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: openAiUserRole.id
+    roleDefinitionId: roleDefinition.id
   }
 }

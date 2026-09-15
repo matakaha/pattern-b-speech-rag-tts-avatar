@@ -418,18 +418,33 @@ server.on('upgrade', (request, socket, head) => {
     webSocket.on('message', (data, isBinary) => {
       const binaryFrame = isBinary ? toArrayBuffer(data) : undefined;
       const textMessage = isBinary ? undefined : data.toString();
+      const frameLimit = binaryFrame ? frameRateLimiter.consume('audio') : undefined;
+      const byteLimit = binaryFrame
+        ? byteRateLimiter.consume('audio', binaryFrame.byteLength)
+        : undefined;
+      let operation = isBinary ? 'audio.binary' : 'control.parse';
       operations = operations
         .then(async () => {
           if (!sessions.get(session.id)) return;
           if (binaryFrame) {
-            const frameLimit = frameRateLimiter.consume('audio');
-            const byteLimit = byteRateLimiter.consume('audio', binaryFrame.byteLength);
             if (
-              !frameLimit.allowed ||
-              !byteLimit.allowed ||
+              !frameLimit?.allowed ||
+              !byteLimit?.allowed ||
               audioStartedAt === 0 ||
               Date.now() - audioStartedAt > config.MAX_AUDIO_DURATION_SECONDS * 1_000
             ) {
+              safeLog({
+                event: 'websocket.audio.limited',
+                severity: 'error',
+                stage: !frameLimit?.allowed
+                  ? 'frame-rate'
+                  : !byteLimit?.allowed
+                    ? 'byte-rate'
+                    : audioStartedAt === 0
+                      ? 'not-started'
+                      : 'duration',
+                count: binaryFrame.byteLength,
+              });
               sendAudioLimitError(send, session.id);
               webSocket.close(1008, 'Audio limit exceeded.');
               return;
@@ -445,6 +460,7 @@ server.on('upgrade', (request, socket, head) => {
           }
 
           const message = ClientMessageSchema.parse(JSON.parse(textMessage ?? ''));
+          operation = message.type;
           if (message.type === 'audio.start') {
             interruptPlayback(true);
             audioStartedAt = Date.now();
@@ -473,6 +489,14 @@ server.on('upgrade', (request, socket, head) => {
             });
             webSocket.close(1011, 'Speech service unavailable.');
           } else {
+            const error = cause instanceof Error ? cause : undefined;
+            safeLog({
+              event: 'websocket.audio.invalid',
+              severity: 'error',
+              operation,
+              errorName: error?.name ?? typeof cause,
+              errorMessage: error?.message.replace(/[\r\n\t]+/g, ' ').slice(0, 300),
+            });
             sendInvalidAudioError(send, session.id);
             webSocket.close(1008, 'Invalid audio message.');
           }

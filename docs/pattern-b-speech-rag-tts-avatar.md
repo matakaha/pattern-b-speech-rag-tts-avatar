@@ -356,7 +356,8 @@ Pattern A と同じイベント名、単位、時刻基準を使う。質問、�
 
 ### Phase 6 の配備と運用
 
-- `infra/main.bicep`はLog Analytics、Application Insights、Storage、Speech、Azure OpenAI、Linux App Service、resource-scoped RBACを構成し、共有AI Searchを`existing`参照する。
+- `infra/main.bicep`はLog Analytics、Application Insights、Storage、Speech、Linux App Service、resource-scoped RBACを構成し、共有AI Searchと共有Foundry accountを`existing`参照する。
+- 共有Foundry accountの`text-embedding-3-small`は変更せず、Pattern Bが所有するResponses API用`gpt-5-mini` deploymentだけを追加する。
 - App ServiceはB1、1 instance、Node.js 24 LTS、Always On、WebSocket、HTTPS-only、TLS 1.2、`/healthz`を使用する。
 - Speech、Search、Azure OpenAIはlocal authenticationを無効にし、Web Appのsystem-assigned Managed Identityだけをランタイム認証に使う。
 - [infra/main.bicepparam](../infra/main.bicepparam) は非秘密の環境差分だけを保持する。秘密値はparameter fileに保存しない。

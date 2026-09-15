@@ -21,6 +21,12 @@ param(
 
     [string]$SearchSemanticConfigName = 'knowledge-semantic',
 
+    [string]$ExistingFoundrySubscriptionId,
+
+    [string]$ExistingFoundryResourceGroupName = 'rg-voice-live-avatar-rag-dev',
+
+    [string]$ExistingFoundryAccountName = 'aif-dev-zmh4qttuqdrbi',
+
     [int]$EmbeddingDimensions = 1536
 )
 
@@ -64,6 +70,28 @@ function Set-DeploymentParameter {
     })
 }
 
+function Get-AzureRoleAssignmentCount {
+    param(
+        [Parameter(Mandatory = $true)][string]$Scope,
+        [Parameter(Mandatory = $true)][string]$PrincipalId,
+        [Parameter(Mandatory = $true)][string]$RoleDefinitionId
+    )
+
+    $filter = [Uri]::EscapeDataString("principalId eq '$PrincipalId'")
+    $url = "https://management.azure.com$Scope/providers/Microsoft.Authorization/roleAssignments?api-version=2022-04-01&`$filter=$filter"
+    $responseJson = Invoke-AzureCli @(
+        'rest', '--method', 'get', '--url', $url,
+        '--only-show-errors', '--output', 'json'
+    )
+    $response = ($responseJson -join [Environment]::NewLine) | ConvertFrom-Json
+
+    return @($response.value | Where-Object {
+        $_.properties.principalId -ieq $PrincipalId -and
+        $_.properties.roleDefinitionId -ieq $RoleDefinitionId -and
+        $_.properties.scope -ieq $Scope
+    }).Count
+}
+
 if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
     throw 'Azure CLI is required. Install it and run az login before deployment.'
 }
@@ -79,6 +107,9 @@ if (-not $ExistingSearchSubscriptionId) {
     $ExistingSearchSubscriptionId = (@(Invoke-AzureCli @(
         'account', 'show', '--query', 'id', '--only-show-errors', '--output', 'tsv'
     )) -join '').Trim()
+}
+if (-not $ExistingFoundrySubscriptionId) {
+    $ExistingFoundrySubscriptionId = $ExistingSearchSubscriptionId
 }
 
 $previousSearchEnvironment = @{
@@ -126,6 +157,9 @@ Set-DeploymentParameter $compiledParameters.parameters 'existingSearchServiceNam
 Set-DeploymentParameter $compiledParameters.parameters 'searchIndexName' $SearchIndexName
 Set-DeploymentParameter $compiledParameters.parameters 'searchSemanticConfigName' $SearchSemanticConfigName
 Set-DeploymentParameter $compiledParameters.parameters 'embeddingDimensions' $EmbeddingDimensions
+Set-DeploymentParameter $compiledParameters.parameters 'existingFoundrySubscriptionId' $ExistingFoundrySubscriptionId
+Set-DeploymentParameter $compiledParameters.parameters 'existingFoundryResourceGroupName' $ExistingFoundryResourceGroupName
+Set-DeploymentParameter $compiledParameters.parameters 'existingFoundryAccountName' $ExistingFoundryAccountName
 
 $temporaryTemplateFile = [IO.Path]::GetTempFileName()
 $temporaryParameterFile = [IO.Path]::GetTempFileName()
@@ -163,22 +197,18 @@ foreach ($property in $deployment.properties.outputs.PSObject.Properties) {
     $outputs[$property.Name] = $property.Value.value
 }
 
-$searchReaderRole = 'Search Index Data Reader'
-$searchRoleCount = Invoke-AzureCli @(
-    'role', 'assignment', 'list',
-    '--assignee', $outputs.appPrincipalId,
-    '--scope', $outputs.searchIndexResourceId,
-    '--role', $searchReaderRole,
-    '--query', 'length(@)',
-    '--only-show-errors',
-    '--output', 'tsv'
-)
-if (($searchRoleCount -join '').Trim() -eq '0') {
+$searchReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
+$searchReaderRoleDefinitionId = "/subscriptions/$ExistingSearchSubscriptionId/providers/Microsoft.Authorization/roleDefinitions/$searchReaderRoleId"
+$searchRoleCount = Get-AzureRoleAssignmentCount `
+    -Scope $outputs.searchIndexResourceId `
+    -PrincipalId $outputs.appPrincipalId `
+    -RoleDefinitionId $searchReaderRoleDefinitionId
+if ($searchRoleCount -eq 0) {
     Invoke-AzureCli @(
         'role', 'assignment', 'create',
         '--assignee-object-id', $outputs.appPrincipalId,
         '--assignee-principal-type', 'ServicePrincipal',
-        '--role', $searchReaderRole,
+        '--role', $searchReaderRoleId,
         '--scope', $outputs.searchIndexResourceId,
         '--only-show-errors',
         '--output', 'none'

@@ -6,6 +6,7 @@ import {
   AudioInputStream,
   AudioStreamFormat,
   CancellationErrorCode,
+  CancellationReason,
   PhraseListGrammar,
   ResultReason,
   SpeechConfig,
@@ -21,6 +22,7 @@ import {
   type TurnId,
 } from '@pattern-b/shared';
 
+import { safeLog } from '../logging/safeLogger.js';
 import { FinalTranscriptAggregator } from './FinalTranscriptAggregator.js';
 
 type ServerEventPayload<Event extends ServerEvent = ServerEvent> = Event extends ServerEvent
@@ -33,7 +35,7 @@ interface SpeechClientHandlers {
   onSpeechStarted: () => void;
   onSpeechEnded: () => void;
   onSessionStopped: () => void;
-  onCanceled: (errorCode: CancellationErrorCode) => void;
+  onCanceled: (reason: CancellationReason, errorCode: CancellationErrorCode) => void;
 }
 
 export interface SpeechClient {
@@ -69,7 +71,7 @@ export class SpeechRecognizerSession {
   readonly #aggregator: FinalTranscriptAggregator;
   #client: SpeechClient | undefined;
   #expectedSequence = 0;
-  #state: 'ready' | 'starting' | 'listening' | 'finishing' | 'closed' = 'ready';
+  #state: 'ready' | 'starting' | 'listening' | 'ending' | 'finishing' | 'closed' = 'ready';
   #speechEndedEmitted = false;
   #cleanupPromise: Promise<void> | undefined;
 
@@ -106,6 +108,7 @@ export class SpeechRecognizerSession {
   }
 
   write(data: ArrayBuffer): void {
+    if (this.#isFinishingEndedSpeech()) return;
     if (this.#state !== 'listening') throw new Error('Speech recognition is not listening.');
 
     const frame = decodeAudioFrame(data);
@@ -119,9 +122,18 @@ export class SpeechRecognizerSession {
   }
 
   end(): void {
+    if (this.#isFinishingEndedSpeech()) return;
     if (this.#state !== 'listening') throw new Error('Speech recognition is not listening.');
+    this.#state = 'ending';
     this.#client?.endAudio();
     this.#aggregator.audioEnded();
+  }
+
+  #isFinishingEndedSpeech(): boolean {
+    return (
+      this.#state === 'ending' ||
+      (this.#speechEndedEmitted && (this.#state === 'finishing' || this.#state === 'ready'))
+    );
   }
 
   async cancel(): Promise<void> {
@@ -158,7 +170,11 @@ export class SpeechRecognizerSession {
       },
       onSpeechEnded: () => this.#handleSpeechEnded(),
       onSessionStopped: () => this.#handleSpeechEnded(),
-      onCanceled: (errorCode) => {
+      onCanceled: (reason, errorCode) => {
+        if (reason === CancellationReason.EndOfStream) {
+          this.#handleSpeechEnded();
+          return;
+        }
         this.#emitSpeechError(errorCode);
         this.#aggregator.cancel();
         void this.#finishTurn(undefined);
@@ -168,6 +184,7 @@ export class SpeechRecognizerSession {
 
   async #finishTurn(text: string | undefined): Promise<void> {
     if (this.#state === 'ready' || this.#state === 'closed' || this.#state === 'finishing') return;
+    if (!this.#speechEndedEmitted) this.#handleSpeechEnded();
     this.#state = 'finishing';
     await this.#disposeClient();
     if (this.#isClosed()) return;
@@ -230,7 +247,7 @@ export class SpeechRecognizerSession {
     recognizer.speechStartDetected = () => handlers.onSpeechStarted();
     recognizer.speechEndDetected = () => handlers.onSpeechEnded();
     recognizer.sessionStopped = () => handlers.onSessionStopped();
-    recognizer.canceled = (_sender, event) => handlers.onCanceled(event.errorCode);
+    recognizer.canceled = (_sender, event) => handlers.onCanceled(event.reason, event.errorCode);
 
     return {
       start: () =>
@@ -248,6 +265,12 @@ export class SpeechRecognizerSession {
   };
 
   #emitSpeechError(errorCode: CancellationErrorCode): void {
+    safeLog({
+      event: 'speech.recognition.canceled',
+      severity: 'error',
+      code: CancellationErrorCode[errorCode] ?? String(errorCode),
+      operation: this.#state,
+    });
     const retryable = [
       CancellationErrorCode.TooManyRequests,
       CancellationErrorCode.ConnectionFailure,

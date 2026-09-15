@@ -1,0 +1,59 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "southeastasia"
+    },
+    "environmentName": {
+      "value": "dev"
+    },
+    "appServicePlanSku": {
+      "value": "B1"
+    },
+    "existingSearchResourceGroupName": {
+      "value": "rg-voice-live-avatar-rag-dev"
+    },
+    "existingSearchServiceName": {
+      "value": "srch-dev-zmh4qttuqdrbi"
+    },
+    "searchIndexName": {
+      "value": "knowledge-index"
+    },
+    "searchSemanticConfigName": {
+      "value": "knowledge-semantic"
+    },
+    "embeddingDimensions": {
+      "value": 1536
+    },
+    "existingFoundryResourceGroupName": {
+      "value": "rg-voice-live-avatar-rag-dev"
+    },
+    "existingFoundryAccountName": {
+      "value": "aif-dev-zmh4qttuqdrbi"
+    },
+    "chatDeploymentName": {
+      "value": "gpt-5-mini"
+    },
+    "chatModelName": {
+      "value": "gpt-5-mini"
+    },
+    "chatModelVersion": {
+      "value": "2025-08-07"
+    },
+    "chatDeploymentSku": {
+      "value": "GlobalStandard"
+    },
+    "chatDeploymentCapacity": {
+      "value": 10
+    },
+    "embeddingDeploymentName": {
+      "value": "text-embedding-3-small"
+    },
+    "tags": {
+      "value": {
+        "workload": "pattern-b-speech-rag-tts-avatar"
+      }
+    }
+  }
+}

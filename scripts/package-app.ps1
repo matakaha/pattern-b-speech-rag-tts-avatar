@@ -32,6 +32,13 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw 'Production dependency installation failed.'
         }
+
+        # ZIP archives do not preserve the Windows junction created for this workspace dependency.
+        $sharedPackagePath = Join-Path $stagingPath 'node_modules/@pattern-b/shared'
+        Remove-Item $sharedPackagePath -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item $sharedPackagePath -ItemType Directory -Force | Out-Null
+        Copy-Item (Join-Path $stagingPath 'src/shared/package.json') -Destination $sharedPackagePath
+        Copy-Item (Join-Path $stagingPath 'src/shared/dist') -Destination $sharedPackagePath -Recurse
     }
     finally {
         Pop-Location
